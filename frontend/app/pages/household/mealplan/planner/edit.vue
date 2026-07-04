@@ -81,6 +81,7 @@
           <p class="pl-2 mb-1">
             {{ $d(plan.date, "short") }}
           </p>
+          <GroupMealPlanDayNutrition class="pl-2 pb-1" :entries="mealplansByDate[plan.date.toString()] ?? []" />
         </v-card>
         <VueDraggable
           v-model="mealplansByDate[plan.date.toString()]"
@@ -241,7 +242,8 @@ import type { MealsByDate } from "./view.vue";
 import type { useMealplans } from "~/composables/use-group-mealplan";
 import { usePlanTypeOptions, getEntryTypeText } from "~/composables/use-group-mealplan";
 import RecipeCardImage from "~/components/Domain/Recipe/RecipeCardImage.vue";
-import type { PlanEntryType, UpdatePlanEntry } from "~/lib/api/types/meal-plan";
+import GroupMealPlanDayNutrition from "~/components/Domain/Household/GroupMealPlanDayNutrition.vue";
+import type { PlanEntryType, ReadPlanEntry, UpdatePlanEntry } from "~/lib/api/types/meal-plan";
 import { useUserApi } from "~/composables/api";
 import { useHouseholdSelf } from "~/composables/use-households";
 import { normalizeFilter } from "~/composables/use-utils";
@@ -266,7 +268,7 @@ const firstDayOfWeek = computed(() => {
 });
 
 // Local mutable meals object
-const mealplansByDate = reactive<{ [date: string]: UpdatePlanEntry[] }>({});
+const mealplansByDate = reactive<{ [date: string]: ReadPlanEntry[] }>({});
 watch(
   () => props.mealplans,
   (plans) => {
