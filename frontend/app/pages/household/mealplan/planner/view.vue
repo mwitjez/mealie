@@ -13,8 +13,8 @@
         class="col-borders my-1 d-flex flex-column"
       >
         <v-card class="mb-2 border-left-primary rounded-sm px-2">
-          <v-container class="px-0 d-flex align-center" height="56px">
-            <v-row no-gutters style="width: 100%;">
+          <v-container class="px-0 py-1">
+            <v-row no-gutters class="align-center" style="width: 100%;">
               <v-col cols="10" class="d-flex align-center">
                 <p class="pl-2 my-1" :class="{ 'text-primary': isToday(day.date) }">
                   {{ $d(day.date, "short") }}
@@ -24,6 +24,7 @@
                 <GroupMealPlanDayContextMenu v-if="day.recipes.length" :recipes="day.recipes" />
               </v-col>
             </v-row>
+            <GroupMealPlanDayNutrition class="pl-2 pb-1" :entries="day.meals" />
           </v-container>
         </v-card>
         <div v-for="section in day.sections" :key="section.title">
@@ -56,6 +57,7 @@ import { isSameDay } from "date-fns";
 
 import type { ReadPlanEntry } from "~/lib/api/types/meal-plan";
 import GroupMealPlanDayContextMenu from "~/components/Domain/Household/GroupMealPlanDayContextMenu.vue";
+import GroupMealPlanDayNutrition from "~/components/Domain/Household/GroupMealPlanDayNutrition.vue";
 import RecipeCardMobile from "~/components/Domain/Recipe/RecipeCardMobile.vue";
 import type { RecipeSummary } from "~/lib/api/types/recipe";
 
@@ -77,6 +79,7 @@ type Days = {
   date: Date;
   sections: DaySection[];
   recipes: RecipeSummary[];
+  meals: ReadPlanEntry[];
 };
 
 const i18n = useI18n();
@@ -95,6 +98,7 @@ const plan = computed<Days[]>(() => {
         { title: i18n.t("meal-plan.dessert"), meals: [] },
       ],
       recipes: [],
+      meals: day.meals,
     };
 
     for (const meal of day.meals) {

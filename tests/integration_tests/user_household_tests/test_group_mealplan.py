@@ -9,6 +9,7 @@ from mealie.schema.meal_plan.new_meal import CreatePlanEntry
 from mealie.schema.meal_plan.plan_rules import PlanRulesDay, PlanRulesOut, PlanRulesSave, PlanRulesType
 from mealie.schema.recipe.recipe import Recipe
 from mealie.schema.recipe.recipe_category import CategoryOut, CategorySave, TagOut, TagSave
+from mealie.schema.recipe.recipe_nutrition import Nutrition
 from tests.utils import api_routes
 from tests.utils.factories import random_string
 from tests.utils.fixture_schemas import TestUser
@@ -56,6 +57,17 @@ def create_rule(
             day=day,
             entry_type=entry_type,
             query_filter_string=query_filter_string,
+        )
+    )
+
+
+def create_recipe_with_nutrition(unique_user: TestUser, nutrition: Nutrition):
+    return unique_user.repos.recipes.create(
+        Recipe(
+            user_id=unique_user.user_id,
+            group_id=UUID(unique_user.group_id),
+            name=random_string(),
+            nutrition=nutrition,
         )
     )
 
@@ -338,3 +350,111 @@ def test_get_mealplan_with_rules_households_filter_includes_any_households(
         assert response.json()["recipe"]["slug"] == recipe.slug
     finally:
         unique_user.repos.group_meal_plan_rules.delete(rule.id)
+
+
+def test_mealplan_entry_includes_recipe_nutrition(api_client: TestClient, unique_user: TestUser):
+    nutrition = Nutrition(
+        calories="350",
+        protein_content="20",
+        carbohydrate_content="40",
+        fat_content="10",
+    )
+    recipe = create_recipe_with_nutrition(unique_user, nutrition)
+
+    new_plan = CreatePlanEntry(date=datetime.now(UTC).date(), entry_type="dinner", recipe_id=recipe.id).model_dump(
+        by_alias=True
+    )
+    new_plan["date"] = datetime.now(UTC).date().strftime("%Y-%m-%d")
+    new_plan["recipeId"] = str(recipe.id)
+
+    # Create returns nutrition
+    response = api_client.post(api_routes.households_mealplans, json=new_plan, headers=unique_user.token)
+    assert response.status_code == 201
+    created = response.json()
+    plan_id = created["id"]
+    assert created["recipe"]["nutrition"]["calories"] == "350"
+    assert created["recipe"]["nutrition"]["proteinContent"] == "20"
+    assert created["recipe"]["nutrition"]["carbohydrateContent"] == "40"
+    assert created["recipe"]["nutrition"]["fatContent"] == "10"
+
+    # Get one returns nutrition
+    response = api_client.get(api_routes.households_mealplans_item_id(plan_id), headers=unique_user.token)
+    assert response.status_code == 200
+    assert response.json()["recipe"]["nutrition"]["calories"] == "350"
+
+    # Update returns nutrition
+    update_payload = response.json()
+    response = api_client.put(
+        api_routes.households_mealplans_item_id(plan_id), headers=unique_user.token, json=update_payload
+    )
+    assert response.status_code == 200
+    assert response.json()["recipe"]["nutrition"]["calories"] == "350"
+
+    # List returns nutrition
+    response = api_client.get(
+        api_routes.households_mealplans, headers=unique_user.token, params={"page": 1, "perPage": -1}
+    )
+    assert response.status_code == 200
+    entry = next(item for item in response.json()["items"] if item["id"] == plan_id)
+    assert entry["recipe"]["nutrition"]["calories"] == "350"
+
+
+def test_mealplan_random_entry_includes_recipe_nutrition(api_client: TestClient, unique_user: TestUser):
+    tag = unique_user.repos.tags.create(TagSave(name=random_string(), group_id=unique_user.group_id))
+    nutrition = Nutrition(calories="425", protein_content="25", carbohydrate_content="45", fat_content="15")
+    recipe = unique_user.repos.recipes.create(
+        Recipe(
+            user_id=unique_user.user_id,
+            group_id=UUID(unique_user.group_id),
+            name=random_string(),
+            tags=[tag],
+            nutrition=nutrition,
+        )
+    )
+    rule = create_rule(unique_user, day=PlanRulesDay.saturday, entry_type=PlanRulesType.breakfast, tags=[tag])
+
+    try:
+        payload = {"date": "2023-02-25", "entryType": "breakfast"}
+        response = api_client.post(api_routes.households_mealplans_random, json=payload, headers=unique_user.token)
+        assert response.status_code == 200
+        assert response.json()["recipe"]["slug"] == recipe.slug
+        assert response.json()["recipe"]["nutrition"]["calories"] == "425"
+        assert response.json()["recipe"]["nutrition"]["proteinContent"] == "25"
+    finally:
+        unique_user.repos.group_meal_plan_rules.delete(rule.id)
+
+
+def test_mealplan_entry_recipe_without_nutrition_returns_empty(api_client: TestClient, unique_user: TestUser):
+    recipe = create_recipe(unique_user)
+
+    new_plan = CreatePlanEntry(date=datetime.now(UTC).date(), entry_type="dinner", recipe_id=recipe.id).model_dump(
+        by_alias=True
+    )
+    new_plan["date"] = datetime.now(UTC).date().strftime("%Y-%m-%d")
+    new_plan["recipeId"] = str(recipe.id)
+
+    response = api_client.post(api_routes.households_mealplans, json=new_plan, headers=unique_user.token)
+    assert response.status_code == 201
+    created = response.json()
+
+    # A recipe with no nutrition still carries a (empty) nutrition object, with every macro null.
+    nutrition = created["recipe"]["nutrition"]
+    assert nutrition is not None
+    assert nutrition["calories"] is None
+    assert nutrition["proteinContent"] is None
+    assert nutrition["carbohydrateContent"] is None
+    assert nutrition["fatContent"] is None
+
+
+def test_mealplan_note_entry_has_no_recipe_nutrition(api_client: TestClient, unique_user: TestUser):
+    new_plan = CreatePlanEntry(
+        date=datetime.now(UTC).date(),
+        entry_type="breakfast",
+        title=random_string(),
+        text=random_string(),
+    ).model_dump()
+    new_plan["date"] = datetime.now(UTC).date().strftime("%Y-%m-%d")
+
+    response = api_client.post(api_routes.households_mealplans, json=new_plan, headers=unique_user.token)
+    assert response.status_code == 201
+    assert response.json()["recipe"] is None

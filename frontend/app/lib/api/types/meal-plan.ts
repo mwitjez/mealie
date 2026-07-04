@@ -100,6 +100,20 @@ export interface RecipeSummary {
   createdAt?: string | null;
   updatedAt?: string | null;
   lastMade?: string | null;
+  nutrition?: Nutrition | null;
+}
+export interface Nutrition {
+  calories?: string | null;
+  carbohydrateContent?: string | null;
+  cholesterolContent?: string | null;
+  fatContent?: string | null;
+  fiberContent?: string | null;
+  proteinContent?: string | null;
+  saturatedFatContent?: string | null;
+  sodiumContent?: string | null;
+  sugarContent?: string | null;
+  transFatContent?: string | null;
+  unsaturatedFatContent?: string | null;
 }
 export interface RecipeCategory {
   id?: string | null;

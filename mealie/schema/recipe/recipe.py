@@ -146,6 +146,11 @@ class RecipeSummary(MealieModel):
     created_at: datetime.datetime | None = None
     updated_at: datetime.datetime | None = UpdatedAtField(None)
     last_made: datetime.datetime | None = None
+
+    # Optional nutrition. Defaults to absent and is only populated where the query
+    # eager-loads `recipe.nutrition` (e.g. meal plan entries). Widening the summary
+    # shape lets the existing recipe nutrition values travel without being re-stored.
+    nutrition: Nutrition | None = None
     model_config = ConfigDict(from_attributes=True)
 
     @field_validator("recipe_servings", "recipe_yield_quantity", mode="before")
@@ -172,6 +177,7 @@ class RecipeSummary(MealieModel):
             joinedload(RecipeModel.tags),
             joinedload(RecipeModel.tools),
             joinedload(RecipeModel.user).load_only(User.household_id),
+            joinedload(RecipeModel.nutrition),
         ]
 
 

@@ -718,6 +718,7 @@ export interface RecipeSummary {
   createdAt?: string | null;
   updatedAt?: string | null;
   lastMade?: string | null;
+  nutrition?: Nutrition | null;
 }
 export interface ShoppingListRemoveRecipeParams {
   recipeDecrementQuantity?: number;
